@@ -1,9 +1,11 @@
 const logger = require('../utils/logger');
+const axios = require('axios');
 
 class InstagramHandler {
   constructor(bot, adminId) {
     this.bot = bot;
     this.adminId = adminId;
+    this.baseUrl = 'https://graph.facebook.com/v18.0';
   }
 
   async handleWebhookUpdate(req, res) {
@@ -16,7 +18,7 @@ class InstagramHandler {
         return res.sendStatus(400);
       }
 
-      // Process changes
+      // Process entries
       if (body.entry && Array.isArray(body.entry)) {
         for (const entry of body.entry) {
           if (entry.changes && Array.isArray(entry.changes)) {
@@ -86,7 +88,7 @@ class InstagramHandler {
 🆔 شناسه پیام: instagram_${sender.id}`;
 
       await this.bot.telegram.sendMessage(this.adminId, text);
-      logger.success(`✅ پیام اینستاگرام به تلگرام فوروارد شد`);
+      logger.success('پیام اینستاگرام به تلگرام فوروارد شد');
     } catch (error) {
       logger.error('Error forwarding Instagram message to Telegram:', error);
     }
@@ -99,8 +101,8 @@ class InstagramHandler {
         return false;
       }
 
-      // Check if this is an Instagram message by looking for the message ID marker
-      const messageIdMatch = repliedMsg.text.match(/🆔 شناسه پیام: instagram_([^\n]+)/);
+      // Extract Instagram user ID from the message
+      const messageIdMatch = repliedMsg.text.match(/شناسه کاربر: ([^\n]+)/);
       if (!messageIdMatch) {
         return false;
       }
@@ -123,17 +125,26 @@ class InstagramHandler {
 
   async sendInstagramReply(userId, message) {
     try {
-      // Here you would implement the actual Instagram API call
-      logger.info(`ارسال پاسخ به کاربر اینستاگرام ${userId}: ${message}`);
-      
-      // Placeholder for actual API implementation
-      if (!userId || !message) {
-        throw new Error('شناسه کاربر یا پیام نامعتبر است');
+      const response = await axios.post(
+        `${this.baseUrl}/me/messages`,
+        {
+          recipient: { id: userId },
+          message: { text: message }
+        },
+        {
+          params: {
+            access_token: process.env.INSTAGRAM_ACCESS_TOKEN
+          }
+        }
+      );
+
+      if (response.data.error) {
+        throw new Error(response.data.error.message);
       }
-      
+
       return true;
     } catch (error) {
-      logger.error('خطا در ارسال پاسخ به اینستاگرام:', error);
+      logger.error('خطا در ارسال پیام به اینستاگرام:', error.response?.data || error);
       throw error;
     }
   }
